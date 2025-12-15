@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { sendMail } from "../services/mailer.js";
 
 // Récupérer toutes les commandes (simple liste)
 export const getOrders = async (req, res) => {
@@ -48,7 +49,14 @@ export const getOrderById = async (req, res) => {
 export const createOrder = async (req, res) => {
   let connection;
   try {
-    const { external_reference, customer_name, status = "PENDING", tracking_number = null, lines = [] } = req.body;
+    const {
+      external_reference,
+      customer_name,
+      customer_email,
+      status = "PENDING",
+      tracking_number = null,
+      lines = [],
+    } = req.body;
 
     if (!external_reference) {
       return res.status(400).json({ message: "external_reference requis" });
@@ -113,9 +121,31 @@ export const createOrder = async (req, res) => {
       [orderId]
     );
 
+    const createdOrder = { ...createdOrderRows[0], lines: createdLines };
+
+    // Notification (best effort)
+    try {
+      await sendMail({
+        to: customer_email,
+        subject: `Nouvelle commande ${createdOrder.external_reference}`,
+        text: `Commande ${createdOrder.external_reference} créée avec ${createdLines.length} ligne(s). Statut: ${createdOrder.status}.`,
+        html: `<p>Une nouvelle commande a été créée.</p>
+              <ul>
+                <li><strong>Référence</strong>: ${createdOrder.external_reference}</li>
+                <li><strong>Client</strong>: ${createdOrder.customer_name || "N/A"}</li>
+                <li><strong>Statut</strong>: ${createdOrder.status}</li>
+                <li><strong>Lignes</strong>: ${createdLines
+                  .map((l) => `${l.quantity} x ${l.sku || l.product_id}`)
+                  .join(", ")}</li>
+              </ul>`,
+      });
+    } catch (mailErr) {
+      console.warn("Envoi mail création commande échoué:", mailErr.message);
+    }
+
     return res.status(201).json({
       message: "Commande créée",
-      order: { ...createdOrderRows[0], lines: createdLines },
+      order: createdOrder,
     });
   } catch (error) {
     if (connection) await connection.rollback();
@@ -130,7 +160,7 @@ export const createOrder = async (req, res) => {
 export const updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, tracking_number } = req.body;
+    const { status, tracking_number, notify_email } = req.body;
 
     if (!status && !tracking_number) {
       return res.status(400).json({ message: "Fournir status ou tracking_number" });
@@ -163,7 +193,28 @@ export const updateOrder = async (req, res) => {
       [id]
     );
 
-    return res.json({ message: "Commande mise à jour", order: orderRows[0] });
+    const updated = orderRows[0];
+
+    // Notification (best effort)
+    if (status || tracking_number) {
+      try {
+        await sendMail({
+          to: notify_email,
+          subject: `Commande ${updated.external_reference} mise à jour`,
+          text: `Statut: ${updated.status}${updated.tracking_number ? `, Tracking: ${updated.tracking_number}` : ""}`,
+          html: `<p>Commande mise à jour.</p>
+                 <ul>
+                   <li><strong>Référence</strong>: ${updated.external_reference}</li>
+                   <li><strong>Statut</strong>: ${updated.status}</li>
+                   ${updated.tracking_number ? `<li><strong>Tracking</strong>: ${updated.tracking_number}</li>` : ""}
+                 </ul>`,
+        });
+      } catch (mailErr) {
+        console.warn("Envoi mail MAJ commande échoué:", mailErr.message);
+      }
+    }
+
+    return res.json({ message: "Commande mise à jour", order: updated });
   } catch (error) {
     console.error("Erreur mise à jour commande:", error.message);
     return res.status(500).json({ message: "Erreur serveur" });

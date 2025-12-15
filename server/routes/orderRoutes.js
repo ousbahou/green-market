@@ -88,6 +88,8 @@ router.get("/:id", authenticate, authorizeRoles("ADMIN", "LOGISTICS", "CUSTOMER_
  *               status:
  *                 type: string
  *                 default: PENDING
+ *               customer_email:
+ *                 type: string
  *               tracking_number:
  *                 type: string
  *               lines:
@@ -140,6 +142,8 @@ router.post("/", authenticate, authorizeRoles("ADMIN", "LOGISTICS"), createOrder
  *               status:
  *                 type: string
  *               tracking_number:
+ *                 type: string
+ *               notify_email:
  *                 type: string
  *     responses:
  *       200:
