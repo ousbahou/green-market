@@ -1,0 +1,40 @@
+# Dependances Node
+node_modules/
+
+# Variables d'environnement
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Logs et PID
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.pid.lock
+
+# Couvrege et rapports
+coverage/
+.nyc_output/
+
+# Builds et artefacts
+build/
+dist/
+
+# Fichiers temporaires
+.tmp/
+tmp/
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
+
+# Tests locaux
+jest-coverage/
