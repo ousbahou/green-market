@@ -1,5 +1,7 @@
 # GreenMarket Orders API
 
+> Préférez `docker compose up --build` depuis la racine (`docker-compose.yml`) pour obtenir un conteneur MySQL configuré et l’API prête à répondre sans installer MySQL localement.
+
 API REST Node.js/Express pour la logistique GreenMarket (auth, produits, commandes) avec MySQL, JWT, Swagger, rôles.
 
 ## Stack
@@ -11,7 +13,7 @@ API REST Node.js/Express pour la logistique GreenMarket (auth, produits, command
 
 ## Prérequis
 - Node.js (>= 18 recommandé)
-- MySQL/MariaDB accessible
+- MySQL/MariaDB accessible (ou lancer la stack Docker Compose)
 
 ## Installation
 ```bash
@@ -22,7 +24,7 @@ npm install
 Créez un fichier `.env` (ou copiez `.env.example`) :
 ```
 PORT=3001
-BASE_URL=http://localhost:3001/api/v1
+BASE_URL=http://localhost:3001
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=gm_user
@@ -53,32 +55,37 @@ npm run dev
 npm start
 ```
 
+### Notes Docker Compose
+- L’API répète maintenant les tentatives de connexion à MySQL au démarrage (`DB_INIT_RETRIES` / `DB_INIT_DELAY` dans `.env`), ce qui garantit qu’elle attendra suffisamment longtemps le conteneur `db` lancé par `docker compose up`.
+- Le script `server/db/init.sql` est monté sous `/docker-entrypoint-initdb.d/` : il crée la structure (`users`, `products`, `orders`, `order_lines`) et les données de base (admin `admin@greenmarket.local` / `Admin@1234`, produit `GM-001`); `server/db/initSchema.js` relit ce fichier après chaque connexion pour recréer les objets manquants et générer un admin-token dès qu’on démarre sans table.
+- Les variables d’environnement définies dans `server/.env.example` sont automatiquement chargées par Docker Compose (fonctionnement identique à un `.env`). Copiez le fichier seulement si vous voulez personnaliser vos secrets avant de démarrer la stack.
+
 Healthcheck : http://localhost:3001/api/v1/health
 Swagger UI : http://localhost:3001/api-docs
 
 ## Rôles et droits
-- **ADMIN** : création de comptes, accès complet.
+- **ADMIN** : création de comptes, accès complet (produits, commandes, utilisateurs). Protection cruciale pour `POST /api/v1/auth/register`.
 - **LOGISTICS** : lecture/écriture commandes (création, statut/tracking), mise à jour stock produits, lecture produits.
 - **CUSTOMER_SERVICE** : lecture commandes et produits uniquement.
 
-> La route `POST /api/v1/auth/register` est protégée : token ADMIN requis. Pour amorcer, promouvoir un premier user en ADMIN via SQL puis se connecter pour obtenir le token.
+> Pour amorcer, créez un premier utilisateur ADMIN via SQL directement dans la base, puis utilisez `POST /api/v1/auth/login` pour obtenir un token.
 
 ## Endpoints principaux (v1)
 - Auth :
-  - POST /api/v1/auth/register (ADMIN)
-  - POST /api/v1/auth/login
+	- POST /api/v1/auth/register (ADMIN)
+	- POST /api/v1/auth/login
 - Products :
-  - GET /api/v1/products (ADMIN, LOGISTICS, CUSTOMER_SERVICE)
-  - POST /api/v1/products (ADMIN, LOGISTICS)
-  - PATCH /api/v1/products/{id} (ADMIN, LOGISTICS)
-  - PATCH /api/v1/products/{id}/stock (ADMIN, LOGISTICS)
-  - DELETE /api/v1/products/{id} (ADMIN)
+	- GET /api/v1/products (ADMIN, LOGISTICS, CUSTOMER_SERVICE)
+	- POST /api/v1/products (ADMIN, LOGISTICS)
+	- PATCH /api/v1/products/{id} (ADMIN, LOGISTICS)
+	- PATCH /api/v1/products/{id}/stock (ADMIN, LOGISTICS)
+	- DELETE /api/v1/products/{id} (ADMIN)
 - Orders :
-  - GET /api/v1/orders (ADMIN, LOGISTICS, CUSTOMER_SERVICE)
-  - GET /api/v1/orders/{id} (ADMIN, LOGISTICS, CUSTOMER_SERVICE)
-  - POST /api/v1/orders (ADMIN, LOGISTICS)
-  - PATCH /api/v1/orders/{id} (ADMIN, LOGISTICS)
-  - DELETE /api/v1/orders/{id} (ADMIN)
+	- GET /api/v1/orders (ADMIN, LOGISTICS, CUSTOMER_SERVICE)
+	- GET /api/v1/orders/{id} (ADMIN, LOGISTICS, CUSTOMER_SERVICE)
+	- POST /api/v1/orders (ADMIN, LOGISTICS)
+	- PATCH /api/v1/orders/{id} (ADMIN, LOGISTICS)
+	- DELETE /api/v1/orders/{id} (ADMIN)
 
 ## Notifications email
 - Facultatif : configurez les variables SMTP_* + MAIL_FROM (+ MAIL_DEFAULT_TO) pour activer l’envoi.
